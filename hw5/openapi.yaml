@@ -1,0 +1,184 @@
+openapi: 3.0.3
+info:
+  title: BarGo — Order & Recipe API
+  version: 1.0.0
+servers:
+  - url: https://api.bargo.example.com/v1
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    OrderRequest:
+      type: object
+      required: [ customer, items, payment_token ]
+      properties:
+        customer:
+          type: object
+          properties:
+            name:
+              type: string
+              description: Имя клиента
+            table:
+              type: integer
+              description: Номер стола
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderItem'
+        payment_token:
+          type: string
+          description: Токен, полученный с фронта после оплаты через YooKassa
+
+    OrderItem:
+      type: object
+      required: [ drink_id, quantity ]
+      properties:
+        drink_id:
+          type: integer
+          description: Идентификатор напитка
+        quantity:
+          type: integer
+          description: Количество заказанных единиц
+
+    OrderResponse:
+      type: object
+      properties:
+        order_id:
+          type: integer
+        status:
+          type: string
+          enum: [ pending_payment, paid, cooking, ready, canceled ]
+          example: pending_payment
+        payment_status:
+          type: string
+          enum: [ approved, declined, pending ]
+          example: pending
+
+  responses:
+    Unauthorized:
+      description: Пользователь не авторизован
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+
+    ValidationError:
+      description: Ошибка валидации запроса
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+
+paths:
+  /orders:
+    post:
+      summary: Создать заказ
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrderRequest'
+      responses:
+        '201':
+          description: Заказ успешно создан
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /orders/{order_id}:
+    get:
+      summary: Получить статус заказа
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: order_id
+          schema:
+            type: integer
+          required: true
+          description: Идентификатор заказа
+      responses:
+        '200':
+          description: Текущий статус заказа
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /recipes:
+    get:
+      summary: Получить список напитков
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Список всех напитков
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: integer
+                    name:
+                      type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /recipes/{drink_id}:
+    get:
+      summary: Получить рецепт напитка
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: drink_id
+          schema:
+            type: integer
+          required: true
+          description: Идентификатор напитка
+      responses:
+        '200':
+          description: Полный рецепт напитка
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: integer
+                  name:
+                    type: string
+                  ingredients:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        name:
+                          type: string
+                        amount:
+                          type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
