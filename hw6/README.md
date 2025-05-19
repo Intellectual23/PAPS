@@ -2,69 +2,72 @@
 
 ```txt
 bar-management-system/
-├── .gitlab-ci.yml                # CI/CD‑конвейер (сборка, тесты, деплой)
-├── README.md                     # Общее описание проекта
-├── charts/                       # Helm‑чарты для Kubernetes
-│   └── bargo/                    # Chart для BarGo API + фронтенда
+├── .gitlab-ci.yml                    # CI/CD‑конвейер
+├── README.md                         # Описание проекта и инструкция по запуску
+├── docs/
+│   ├── deployment_diagram.puml       # PlantUML‑исходник диаграммы развёртывания
+│   ├── 4C_model.puml                 # PlantUML‑исходник 4C‑диаграммы
+│   ├── api_spec.yaml                 # OpenAPI 3.0 спецификация BarGo API
+│   └── architecture.md               # ЗАР‑документы (Д5, Д6 и т.д.)
+│
+├── frontend/                         # Веб‑приложение (Web‑интерфейс)
+│   ├── Dockerfile
+│   ├── nginx.conf
+│   ├── package.json
+│   └── src/
+│       └── ...
+│
+├── auth-comp/                        # Компонент авторизации (auth‑comp)
+│   ├── Dockerfile
+│   ├── src/                          # Spring Security + JWT
+│   └── config/
+│
+├── order-waiter-comp/                # Управление заказами (order‑waiter‑comp)
+│   ├── Dockerfile
+│   ├── src/                          # REST‑контроллеры для /orders
+│   └── config/
+│
+├── store-bartender-comp/             # Учёт ингредиентов (store‑bartender‑comp)
+│   ├── Dockerfile
+│   ├── src/                          # REST‑контроллеры для /recipes
+│   └── config/
+│
+├── manage-admin-comp/                # CRUD‑админка (manage‑admin‑comp)
+│   ├── Dockerfile
+│   ├── src/                          # REST‑контроллеры /admin/…
+│   └── config/
+│
+├── report-admin-comp/                # BI‑адаптер (report‑admin‑comp)
+│   ├── Dockerfile
+│   ├── src/                          # Spring + Metabase REST API клиент
+│   └── config/
+│
+├── payment-comp/                     # Платёжный адаптер (payment‑comp)
+│   ├── Dockerfile
+│   ├── src/                          # REST‑клиент YooKassa
+│   └── config/
+│
+├── bi-adapter/                       # (опционально) Metabase в Docker
+│   ├── docker-compose.yml
+│   └── env/                          # Конфиги окружения для BI
+│
+├── charts/                           # Helm‑чарты для Kubernetes
+│   └── bargo/
 │       ├── Chart.yaml
 │       ├── values.yaml
 │       └── templates/
 │           ├── deployment.yaml
 │           ├── service.yaml
-│           ├── ingress.yaml
-│           └── configmap.yaml
+│           └── ingress.yaml
 │
-├── frontend/                     # Web‑клиент (React/Vue)
-│   ├── Dockerfile                # Сборка и упаковка SPA
-│   ├── nginx.conf                # Конфигурация Nginx для статических файлов
-│   ├── package.json
-│   ├── public/
-│   └── src/
-│       ├── components/
-│       └── index.js
+├── infra/                            # Инфраструктурные манифесты
+│   ├── k8s/                          # «Чистые» YAML‑манифесты K8s
+│   └── terraform/                    # (опционально) Terraform
 │
-├── backend/                      # BarGo API (Spring Boot)
-│   ├── Dockerfile                # Сборка bar‑api.jar и запуск
-│   ├── build.gradle / pom.xml
-│   ├── src/
-│   │   ├── main/
-│   │   │   ├── java/…             # исходники сервисов и адаптеров
-│   │   │   └── resources/
-│   │   │       └── application.yml
-│   │   └── test/…
-│   └── flyway/                   # Миграции БД
-│       └── migrations/
-│           ├── V1__init_schema.sql
-│           ├── V2__add_order_table.sql
-│           └── …
-│
-├── payment‑adapter/              # Микросервис–адаптер для YooKassa
-│   ├── Dockerfile
-│   ├── src/…                     # реализация REST‑клиента к YooKassa
-│   └── config/
-│
-├── bi‑adapter/                   # Микросервис–адаптер для Metabase
-│   ├── Dockerfile
-│   ├── src/…                     # REST/SQ L‑клиент к Metabase
-│   └── config/
-│
-├── infra/                        # Инфраструктурные манифесты
-│   ├── k8s/                      # «чистый» мануал K8s без Helm
-│   │   ├── backend-deployment.yaml
-│   │   ├── frontend-deployment.yaml
-│   │   └── mongo-config.yaml
-│   └── terraform/                # (опционально) IaC Terraform скрипты
-│       └── main.tf
-│
-├── metabase/                     # Авто‑деплой Metabase в Docker
-│   ├── docker-compose.yml
-│   └── env/                      # конфиги окружения (секреты через Vault)
-│
-├── scripts/                      # Утилиты и helper‑скрипты
-│   ├── deploy.sh                 # вызов kubectl/helm по средам
+├── scripts/                          # Скрипты деплоя и отката
+│   ├── deploy.sh
 │   └── rollback.sh
 │
-└── docs/
-    ├── deployment_diagram.puml   # PlantUML исходник диаграммы развёртывания
-    ├── api_spec.yaml             # OpenAPI‑спецификация BarGo API
-    └── architecture.md           # Архитектурные документы (ЗАРы)
+└── backend/                          # (оставить только, если есть общее API)
+    ├── Dockerfile
+    └── src/                          # Общие утилиты, если order‑waiter/… разделены
