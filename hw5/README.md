@@ -1,23 +1,21 @@
-# 4. Интерфейсы взаимодействия с окружением (API)
+## 4. Интерфейсы взаимодействия с окружением (API)
 
-## 4.1 Внешние интерфейсы, используемые системой
+### 4.1. Внешние интерфейсы, используемые системой
 
-### 4.1.1 Платёжная система (YooKassa)
+#### 4.1.1. Платёжная система (YooKassa)
 
-**Протокол**: HTTPS, REST
-**Аутентификация**: OAuth 2.0 Bearer (заголовок `Authorization: Bearer {token}`)
-**Формат**: JSON
+* **Протокол:** HTTPS, REST
+* **Аутентификация:** OAuth2 Bearer (заголовок `Authorization: Bearer {token}`)
+* **Формат:** JSON
 
-#### Таблица операций
+| Операция                  | Метод | URL                                                | Назначение                                                                      |
+| ------------------------- | ----- | -------------------------------------------------- | ------------------------------------------------------------------------------- |
+| Создание платежа          | POST  | `https://api.yookassa.ru/v3/payments`              | Инициировать платёж по `order_id`, `amount`, `currency`, `payment_method_token` |
+| Получение статуса платежа | GET   | `https://api.yookassa.ru/v3/payments/{payment_id}` | Узнать статус (`succeeded`/`pending`/`canceled`)                                |
 
-| Операция                  | Метод | URL                                                                                  | Описание                                                         |
-|---------------------------|-------|--------------------------------------------------------------------------------------|------------------------------------------------------------------|
-| Создание платежа          | POST  | [https://api.yookassa.ru/v3/payments](https://api.yookassa.ru/v3/payments)           | Инициировать платёж по `order_id`, `amount`, `currency`, `token` |
-| Получение статуса платежа | GET   | [https://api.yookassa.ru/v3/payments/{id}](https://api.yookassa.ru/v3/payments/{id}) | Получить статус: `succeeded`/`pending`/`canceled`                |
+**Пример запроса**:
 
-#### Пример запроса (создание платежа)
-
-```
+```http
 POST /v3/payments HTTP/1.1
 Host: api.yookassa.ru
 Authorization: Bearer AQAB…xyz
@@ -25,99 +23,78 @@ Content-Type: application/json
 
 {
   "amount": { "value": "123.45", "currency": "RUB" },
-  "confirmation": {
-    "type": "embed",
-    "return_url": "https://bar.example.com/orders/42"
-  },
+  "confirmation": { "type": "embed", "return_url": "https://api.bargo.example.com/v1/orders/42" },
   "metadata": { "order_id": "42" }
 }
 ```
 
-#### Пример ответа
+**Пример успешного ответа**:
 
 ```json
 {
   "id": "21b0ef94-000f-5000-9000-1c1c00000031",
   "status": "succeeded",
   "paid": true,
-  "amount": {
-    "value": "123.45",
-    "currency": "RUB"
-  },
-  "metadata": {
-    "order_id": "42"
-  }
+  "amount": { "value": "123.45", "currency": "RUB" },
+  "metadata": { "order_id": "42" }
 }
 ```
 
-#### Обработка ошибок
+**Ошибки и QoS**:
 
-* **400 Bad Request** — неверный формат данных (JSON-валидация).
-* **401 Unauthorized** — неверный или просроченный токен.
-* **429 Too Many Requests** — превышен лимит (10 запросов/сек).
-* **5xx** — временные сбои (рекомендуется retry до 3 раз с экспоненциальным бэкоффом).
+* `400 Bad Request` – валидация JSON
+* `401 Unauthorized` – неверный токен
+* `429 Too Many Requests` – >10 req/s (rate limit)
+* `5xx` – retry ×3 с эксп. бэкофф
+* Тайм-аут: 5 s
 
 ---
 
-### 4.1.2 HR-сервис (BambooHR-like REST API)
+#### 4.1.2. Аналитическая BI-система (Metabase)
 
-**Протокол**: HTTPS, REST
-**Аутентификация**: OAuth 2.0 Bearer или API-ключ в заголовке `X-API-Key`
-**Формат**: JSON
+* **Протокол:** HTTPS, REST или напрямую SQL (JDBC)
+* **Аутентификация:** токен (`X-Metabase-Session`) или LDAP/Basic Auth
+* **Форматы:** JSON для REST, CSV для экспорта результатов
 
-#### Таблица операций
+| Операция                | Метод | URL                                                    | Описание                                                   |
+| ----------------------- | ----- | ------------------------------------------------------ | ---------------------------------------------------------- |
+| Авторизация             | POST  | `https://bi.example.com/api/session`                   | Получить session-токен                                     |
+| Список дашбордов        | GET   | `https://bi.example.com/api/dashboard`                 | Мета-данные доступных дашбордов                            |
+| Детали дашборда         | GET   | `https://bi.example.com/api/dashboard/{id}`            | Карточки (charts) внутри дашборда                          |
+| Данные карточки в JSON  | GET   | `https://bi.example.com/api/card/{card_id}/query/json` | Выполнить SQL-запрос карточки, вернуть JSON                |
+| Данные карточки в CSV   | GET   | `https://bi.example.com/api/card/{card_id}/query/csv`  | Выполнить SQL-запрос карточки, вернуть CSV                 |
+| Произвольный SQL-запрос | POST  | `https://bi.example.com/api/dataset`                   | Тело `{ "database": <id>, "native": { "query": "SQL…" } }` |
 
-| Операция                 | Метод | URL                                                                                          | Описание                                  |
-|--------------------------|-------|----------------------------------------------------------------------------------------------|-------------------------------------------|
-| Список сотрудников       | GET   | [https://hr.example.com/api/v1/employees](https://hr.example.com/api/v1/employees)           | Получить все активные профили             |
-| Детали одного сотрудника | GET   | [https://hr.example.com/api/v1/employees/{id}](https://hr.example.com/api/v1/employees/{id}) | Расписание и смены конкретного сотрудника |
+**Пример получения токена**:
 
-#### Пример запроса
+```http
+POST /api/session HTTP/1.1
+Host: bi.example.com
+Content-Type: application/json
 
+{ "username": "admin", "password": "••••••" }
 ```
-GET /api/v1/employees HTTP/1.1
-Host: hr.example.com
-Authorization: Bearer eyJ…ABC
+
+**Пример списка дашбордов**:
+
+```http
+GET /api/dashboard HTTP/1.1
+Host: bi.example.com
+X-Metabase-Session: A1B2C3D4…
 Accept: application/json
 ```
 
-#### Пример ответа
+**Ошибки и QoS**:
 
-```json
-[
-  {
-    "id": 17,
-    "full_name": "Иванов Иван Иванович",
-    "position": "Бармен",
-    "shifts": [
-      {
-        "date": "2025-05-10",
-        "start": "18:00",
-        "end": "02:00"
-      }
-    ],
-    "contact": {
-      "email": "ivanov@example.com",
-      "phone": "+7 900 123-45-67"
-    }
-  }
-  …
-]
-```
-
-#### Обработка ошибок
-
-* **401 Unauthorized** — неверный токен.
-* **403 Forbidden** — недостаточно прав доступа.
-* **404 Not Found** — сотрудник не найден.
+* `401 Unauthorized` – неверный/истёкший токен
+* `403 Forbidden` – недостаточно прав
+* `404 Not Found` – не найден `dashboard_id` или `card_id`
+* `429 Too Many Requests` – >30 req/min
+* TLS 1.2+, не логировать сырые данные
 
 ---
 
-## 4.2 Публичные API, предоставляемые нашей системой
-
-Мы специфицируем RESTful API по стандарту **OpenAPI 3.0**.
-
-### 4.2.1 Компоненты OpenAPI
+### 4.2. Публичные API «BarGo API»
 
 ```yaml
 openapi: 3.0.3
@@ -126,6 +103,7 @@ info:
   version: 1.0.0
 servers:
   - url: https://api.bargo.example.com/v1
+
 components:
   securitySchemes:
     BearerAuth:
@@ -141,140 +119,171 @@ components:
         customer:
           type: object
           properties:
-            name:
-              type: string
-            table:
-              type: integer
+            name:   { type: string }
+            table:  { type: integer }
         items:
           type: array
-          items:
-            $ref: '#/components/schemas/OrderItem'
+          items: { $ref: '#/components/schemas/OrderItem' }
         payment_token:
           type: string
-          description: Token from YooKassa UI
-
     OrderItem:
       type: object
       required: [ drink_id, quantity ]
       properties:
-        drink_id:
-          type: integer
-        quantity:
-          type: integer
-
+        drink_id: { type: integer }
+        quantity: { type: integer }
     OrderResponse:
       type: object
       properties:
-        order_id:
-          type: integer
+        order_id:       { type: integer }
         status:
           type: string
           enum: [ pending_payment, paid, cooking, ready, canceled ]
         payment_status:
           type: string
           enum: [ approved, declined, pending ]
-security:
-  - BearerAuth: [ ]
 ```
 
+#### 4.2.1. Эндпойнты
+
+```yaml
+paths:
+  /orders:
+    post:
+      summary: Создать новый заказ
+      tags: [orders-adapter]
+      security: [ { BearerAuth: [] } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/OrderRequest' }
+      responses:
+        '201': { description: Заказ создан, оплата в процессе, content: { application/json: { schema: { $ref: '#/components/schemas/OrderResponse' } } } }
+        '400': { description: Некорректный запрос }
+        '402': { description: Оплата отклонена }
+        '500': { description: Внутренняя ошибка }
+
+  /orders/{order_id}:
+    get:
+      summary: Получить статус заказа
+      tags: [orders-adapter]
+      security: [ { BearerAuth: [] } ]
+      parameters:
+        - in: path
+          name: order_id
+          schema: { type: integer }
+          required: true
+      responses:
+        '200': { description: Информация о заказе, content: { application/json: { schema: { $ref: '#/components/schemas/OrderResponse' } } } }
+        '404': { description: Заказ не найден }
+
+  /recipes:
+    get:
+      summary: Список напитков
+      tags: [recipes-adapter]
+      security: [ { BearerAuth: [] } ]
+      responses:
+        '200': 
+          description: Массив напитков
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:   { type: integer }
+                    name: { type: string }
+
+  /recipes/{drink_id}:
+    get:
+      summary: Детальный рецепт напитка
+      tags: [recipes-adapter]
+      security: [ { BearerAuth: [] } ]
+      parameters:
+        - in: path
+          name: drink_id
+          schema: { type: integer }
+          required: true
+      responses:
+        '200':
+          description: Полный рецепт
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ingredients:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        name:   { type: string }
+                        amount: { type: string }
+        '404': { description: Напиток не найден }
+```
+
+#### 4.2.2. Протокол взаимодействия и QoS
+
+1. Клиент (Web-интерфейс) → `POST /orders` + JWT → **orders-adapter**
+2. **orders-adapter** → **payment-adapter** → YooKassa
+3. При `approved` → сохранение → возврат `201`; при `declined` → `402`
+4. Клиент опрашивает `GET /orders/{order_id}` для обновления UI
+
+* **Тайм-ауты:** 5 s (платёж), 2 s (рецепты)
+* **Retry:** до 3 попыток (эксп. бэкофф)
+* **Rate-limit:** 50 req/s (public), 10 req/s (`payment-adapter`)
+* **SLAs:** P95 <200 ms, 99.9 % uptime
+
+#### 4.2.3. Безопасность
+
+* Все соединения TLS 1.3
+* JWT (TTL 5 min) + refresh
+* RBAC:
+
+  * **officiant** — `orders-adapter` (POST/GET)
+  * **bartender** — `recipes-adapter` (GET) + обновление статуса
+  * **admin** — все эндпойнты + `bi-adapter` + CRUD через `manage-admin-comp` (если добавлен)
+* Чувствительные поля (`payment_token`) не логируются
+
 ---
 
-### 4.2.2 Эндпойнты
-
-| Операция               | Метод | Путь                  | Описание                                           |
-|------------------------|-------|-----------------------|----------------------------------------------------|
-| Создать заказ          | POST  | `/orders`             | Создаёт заказ, инициирует оплату                   |
-| Получить статус заказа | GET   | `/orders/{order_id}`  | Возвращает `OrderResponse`                         |
-| Список напитков        | GET   | `/recipes`            | Возвращает массив `{id, name}`                     |
-| Детали рецепта напитка | GET   | `/recipes/{drink_id}` | Возвращает полный рецепт (ингредиенты и пропорции) |
-
----
-
-### 4.2.3 Протокол взаимодействия
-
-1. Клиент отправляет `POST /orders` с JSON-телом и заголовком
-   `Authorization: Bearer {JWT}`.
-2. Сервер валидирует токен, парсит запрос и вызывает компонент **PaymentAdapter**.
-3. **PaymentAdapter**:
-
-    * `POST https://api.yookassa.ru/v3/payments`
-    * Ждёт ответа; при `succeeded` продолжает, при `declined` отдаёт 402.
-4. Сервер сохраняет заказ, возвращает `201 Created`.
-5. Клиент опрашивает `GET /orders/{order_id}` для обновления UI.
-
----
-
-### 4.2.4 Обработка ошибок и требования QoS
-
-* **Коды ответов**:
-
-    * 4xx – валидация, авторизация
-    * 5xx – внутренние ошибки (retryable)
-* **Тайм-ауты**:
-
-    * 5 s на внешний вызов платежа
-    * 2 s на чтение рецептов
-* **Retry**: до 3 попыток по экспоненциальному бэкоффу
-* **Rate limiting**:
-
-    * 50 req/s на публичных эндпойнтах
-    * 10 req/s на PaymentAdapter
-* **SLA**: 99.9 % uptime, P95 latency < 200 ms
-
----
-
-### 4.2.5 Безопасность
-
-* TLS 1.3 для всех соединений.
-* JWT с TTL 5 мин и refresh-токенами.
-* RBAC (роль «официант» только создаёт и читает заказы; «бармен» – читает рецепты и обновляет статус приготовления;
-  «админ» – полный доступ).
-* Не логировать чувствительные данные (`payment_token`, `card_data`).
-
----
-
-## 4.3 Примеры использования
-
-**1. Создание заказа**
+### 4.3. Примеры использования
 
 ```bash
+# 1. Создание заказа
 curl -X POST https://api.bargo.example.com/v1/orders \
-  -H "Authorization: Bearer eyJ…" \
+  -H "Authorization: Bearer {jwt}" \
   -H "Content-Type: application/json" \
   -d '{
     "customer": { "name": "Иван", "table": 12 },
     "items": [{ "drink_id": 5, "quantity": 2 }],
-    "payment_token": "tok_1Kxyz…"
+    "payment_token": "tok_1K..."
   }'
+# 201 Created
 ```
-
-**Ответ (201 Created)**
-
-```json
-{
-  "order_id": 101,
-  "status": "pending_payment",
-  "payment_status": "pending"
-}
-```
-
----
-
-**2. Проверка статуса**
 
 ```bash
+# 2. Проверка статуса
 curl https://api.bargo.example.com/v1/orders/101 \
-  -H "Authorization: Bearer eyJ…"
+  -H "Authorization: Bearer {jwt}"
+# 200 OK
+# {
+#   "order_id": 101,
+#   "status": "paid",
+#   "payment_status": "approved"
+# }
 ```
 
-**Ответ (200 OK)**
-
-```json
-{
-  "order_id": 101,
-  "status": "paid",
-  "payment_status": "approved"
-}
+```bash
+# 3. Получить дашборды Metabase
+curl https://bi.example.com/api/dashboard \
+  -H "X-Metabase-Session: {session_id}"
 ```
 
----
+```bash
+# 4. Запрос данных карточки в CSV
+curl https://bi.example.com/api/card/12/query/csv \
+  -H "X-Metabase-Session: {session_id}"
+```
